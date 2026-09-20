@@ -43,8 +43,10 @@ jobs:
 
       - name: Build and push
         run: |
-          IMAGE=${{ env.REGISTRY }}/${{ secrets.OCI_NAMESPACE }}/hello:${{ github.sha }}
-          docker buildx build --platform linux/arm64 -t $IMAGE --push .
+
+          REPO=${{ env.REGISTRY }}/${{ secrets.OCI_NAMESPACE }}/hello
+          docker buildx build --platform linux/arm64 -t $REPO:${{ github.sha }} -t $REPO:latest --push .
+
 
       - name: Get kubeconfig
         run: |
