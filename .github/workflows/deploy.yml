@@ -1,0 +1,64 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGION: uk-london-1
+  REGISTRY: lhr.ocir.io
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure OCI CLI
+        run: |
+          mkdir -p ~/.oci
+          echo "${{ secrets.OCI_KEY }}" | base64 -d > ~/.oci/key.pem
+          chmod 600 ~/.oci/key.pem
+          cat > ~/.oci/config <<CFG
+          [DEFAULT]
+          user=${{ secrets.OCI_USER_OCID }}
+          tenancy=${{ secrets.OCI_TENANCY_OCID }}
+          fingerprint=${{ secrets.OCI_FINGERPRINT }}
+          region=${{ env.REGION }}
+          key_file=$HOME/.oci/key.pem
+          CFG
+          sed -i 's/^ *//' ~/.oci/config
+          pip install --quiet oci-cli
+          oci iam region list --output table
+
+      - name: Log in to OCIR
+        run: |
+          echo "${{ secrets.OCIR_TOKEN }}" | docker login ${{ env.REGISTRY }} \
+            -u "${{ secrets.OCIR_USERNAME }}" --password-stdin
+
+      - name: Set up ARM builds
+        uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        run: |
+          IMAGE=${{ env.REGISTRY }}/${{ secrets.OCI_NAMESPACE }}/hello:${{ github.sha }}
+          docker buildx build --platform linux/arm64 -t $IMAGE --push .
+
+      - name: Get kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          oci ce cluster create-kubeconfig \
+            --cluster-id ${{ secrets.OKE_CLUSTER_OCID }} \
+            --file ~/.kube/config \
+            --region ${{ env.REGION }} \
+            --token-version 2.0.0
+          chmod 600 ~/.kube/config
+
+      - name: Deploy
+        run: |
+          kubectl apply -f k8s/
+          kubectl set image deployment/hello \
+            web=${{ env.REGISTRY }}/${{ secrets.OCI_NAMESPACE }}/hello:${{ github.sha }}
+          kubectl rollout status deployment/hello --timeout=120s

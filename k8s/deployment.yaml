@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hello
+  template:
+    metadata:
+      labels:
+        app: hello
+    spec:
+      imagePullSecrets:
+        - name: ocir-secret
+      containers:
+        - name: web
+          # CHANGE lrevx1zi6sjl below to your OCI namespace (run: oci os ns get)
+          image: lhr.ocir.io/lrevx1zi6sjl/hello:latest
+          ports:
+            - containerPort: 80
