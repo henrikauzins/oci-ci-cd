@@ -45,8 +45,7 @@ jobs:
         run: |
 
           REPO=${{ env.REGISTRY }}/${{ secrets.OCI_NAMESPACE }}/hello
-          docker buildx build --platform linux/arm64 -t $REPO:${{ github.sha }} -t $REPO:latest --push .
-
+          docker buildx build --platform linux/amd64,linux/arm64 -t $REPO:${{ github.sha }} -t $REPO:latest --push .
 
       - name: Get kubeconfig
         run: |
